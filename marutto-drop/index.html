@@ -88,6 +88,9 @@ h1 span:nth-child(4) { color: var(--candy); }
   background: rgb(15 11 31 / 0.82);
   backdrop-filter: blur(2px);
 }
+.cast { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.cast figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 0.7rem; color: var(--ink); line-height: 1.2; }
+.cast canvas { width: 44px; height: 44px; }
 .overlay h2 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 1.5rem; }
 .overlay p { margin: 0; color: var(--muted); font-size: 0.82rem; }
 .overlay .big { color: var(--ink); font-size: 1rem; font-variant-numeric: tabular-nums; }
@@ -196,6 +199,7 @@ button:focus-visible { outline: 3px solid var(--candy); outline-offset: 2px; }
       <div class="overlay" id="overlay">
         <h2 id="ovTitle">あそびかた</h2>
         <p id="ovText">2つ1組で落ちてくる玉を回して積み、同じ色を4つ以上つなげると消えます。消えたあとに落ちた玉がまたそろうと<b style="color:var(--candy)">連鎖</b>で高得点。</p>
+        <div class="cast" id="cast"></div>
         <button class="start" id="startBtn" type="button">スタート</button>
       </div>
     </div>
@@ -254,10 +258,10 @@ button:focus-visible { outline: 3px solid var(--candy); outline-offset: 2px; }
   const NUM_COLORS = 4;
   const COLORS = [
     null,
-    { base: '#ff5a6e', dark: '#b8213f', light: '#ffc2ca' }, // red
-    { base: '#3ddc84', dark: '#178a4c', light: '#bff5d6' }, // green
-    { base: '#4fa3ff', dark: '#1d5fb8', light: '#c6e1ff' }, // blue
-    { base: '#ffd23f', dark: '#b8901a', light: '#fff0b8' }, // yellow
+    { base: '#ff8a3d', dark: '#c2541a', light: '#ffd3b0', name: 'にこにこ' }, // big laugh, spiky hair
+    { base: '#3f7dff', dark: '#1f45b0', light: '#c4d6ff', name: 'ガッツ' },   // straight bangs, fists up
+    { base: '#ffd23f', dark: '#b8901a', light: '#fff0b8', name: 'くるくる' }, // curly hair with a top bun
+    { base: '#eef0f6', dark: '#a3a8bf', light: '#ffffff', name: 'ボール' },   // baseball
   ];
   // Child offset for each rotation: 0 = above, 1 = right, 2 = below, 3 = left.
   const DIRS = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -458,6 +462,7 @@ button:focus-visible { outline: 3px solid var(--candy); outline-offset: 2px; }
     const isBest = score > best;
     if (isBest) { best = score; store.set('marutto-best', String(best)); }
     updateHud();
+    cast.hidden = true;
     ovTitle.textContent = 'ゲームオーバー';
     ovText.innerHTML = `<span class="big">スコア ${score.toLocaleString()}</span><br>最大 ${maxChain} 連鎖${isBest ? '<br><b style="color:var(--candy)">ハイスコア更新!</b>' : ''}`;
     startBtn.textContent = 'もう一度';
@@ -477,6 +482,7 @@ button:focus-visible { outline: 3px solid var(--candy); outline-offset: 2px; }
     if (state === 'play' || state === 'settle' || state === 'pop') {
       pausedFrom = state;
       state = 'paused';
+      cast.hidden = true;
       ovTitle.textContent = '一時停止中';
       ovText.textContent = 'P キーかボタンで再開します。';
       startBtn.textContent = '再開';
@@ -538,35 +544,177 @@ button:focus-visible { outline: 3px solid var(--candy); outline-offset: 2px; }
   }
 
   // ---- Rendering -------------------------------------------------------
+  const HAIR = '#2b1d1c';
+  const INK = '#1b1530';
+
+  function ballPath(g, cx, cy, r) {
+    g.beginPath();
+    // Slightly squashed circle reads as soft and jelly-like.
+    g.ellipse(cx, cy + r * 0.04, r, r * 0.94, 0, 0, Math.PI * 2);
+  }
+
+  function dotEyes(g, cx, ey, ex, size, blink) {
+    if (blink) {
+      g.strokeStyle = INK; g.lineWidth = size * 0.6; g.lineCap = 'round';
+      for (const s of [-1, 1]) { g.beginPath(); g.moveTo(cx + s * ex - size, ey); g.lineTo(cx + s * ex + size, ey); g.stroke(); }
+      return;
+    }
+    g.fillStyle = INK;
+    for (const s of [-1, 1]) { g.beginPath(); g.ellipse(cx + s * ex, ey, size * 0.85, size, 0, 0, Math.PI * 2); g.fill(); }
+    g.fillStyle = '#ffffff';
+    for (const s of [-1, 1]) { g.beginPath(); g.arc(cx + s * ex - size * 0.3, ey - size * 0.4, size * 0.36, 0, Math.PI * 2); g.fill(); }
+  }
+
+  function cheeks(g, cx, y, r) {
+    g.fillStyle = 'rgba(255, 110, 140, 0.5)';
+    for (const s of [-1, 1]) { g.beginPath(); g.ellipse(cx + s * r * 0.58, y, r * 0.16, r * 0.09, 0, 0, Math.PI * 2); g.fill(); }
+  }
+
+  // Parts that stick out behind the ball (the top bun).
+  function drawBehind(g, cx, cy, r, color) {
+    if (color !== 3) return;
+    g.fillStyle = HAIR;
+    const bx = cx + r * 0.05, by = cy - r * 0.95;
+    for (const [dx, dy, rr] of [[0, 0, 0.3], [-0.2, 0.08, 0.2], [0.2, 0.06, 0.2], [0.05, -0.15, 0.18]]) {
+      g.beginPath(); g.arc(bx + dx * r, by + dy * r, rr * r, 0, Math.PI * 2); g.fill();
+    }
+  }
+
+  function drawFace(g, cx, cy, r, color, blink) {
+    g.save();
+    ballPath(g, cx, cy, r);
+    g.clip();
+    g.fillStyle = HAIR;
+    if (color === 1) {
+      // にこにこ: short hair swept to one side
+      g.beginPath();
+      g.moveTo(cx - r * 1.1, cy - r * 0.15);
+      g.lineTo(cx - r * 0.75, cy - r * 0.32);
+      g.lineTo(cx - r * 0.5, cy - r * 0.22);
+      g.lineTo(cx - r * 0.2, cy - r * 0.42);
+      g.lineTo(cx + r * 0.1, cy - r * 0.3);
+      g.lineTo(cx + r * 0.45, cy - r * 0.5);
+      g.lineTo(cx + r * 0.75, cy - r * 0.32);
+      g.lineTo(cx + r * 1.1, cy - r * 0.2);
+      g.lineTo(cx + r * 1.1, cy - r * 1.2);
+      g.lineTo(cx - r * 1.1, cy - r * 1.2);
+      g.closePath();
+      g.fill();
+    } else if (color === 2) {
+      // ガッツ: straight bowl bangs
+      g.beginPath();
+      g.moveTo(cx - r * 1.1, cy - r * 0.05);
+      const n = 7;
+      for (let i = 0; i <= n; i++) {
+        g.lineTo(cx - r * 0.95 + (i * 1.9 * r) / n, cy - r * (i % 2 ? 0.2 : 0.3));
+      }
+      g.lineTo(cx + r * 1.1, cy - r * 0.05);
+      g.lineTo(cx + r * 1.1, cy - r * 1.2);
+      g.lineTo(cx - r * 1.1, cy - r * 1.2);
+      g.closePath();
+      g.fill();
+    } else if (color === 3) {
+      // くるくる: a ring of curls framing the face
+      for (let a = 160; a <= 380; a += 22) {
+        const t = (a * Math.PI) / 180;
+        g.beginPath(); g.arc(cx + Math.cos(t) * r * 0.86, cy + Math.sin(t) * r * 0.86, r * 0.26, 0, Math.PI * 2); g.fill();
+      }
+      for (let a = 205; a <= 335; a += 26) {
+        const t = (a * Math.PI) / 180;
+        g.beginPath(); g.arc(cx + Math.cos(t) * r * 0.6, cy + Math.sin(t) * r * 0.6, r * 0.22, 0, Math.PI * 2); g.fill();
+      }
+    } else if (color === 4) {
+      // Baseball stitches
+      g.strokeStyle = '#d8313f';
+      g.lineCap = 'round';
+      for (const s of [-1, 1]) {
+        const ox = cx + s * r * 1.45, R = r * 0.98;
+        g.lineWidth = r * 0.07;
+        g.beginPath(); g.arc(ox, cy, R, s < 0 ? -0.75 : Math.PI - 0.75, s < 0 ? 0.75 : Math.PI + 0.75); g.stroke();
+        g.lineWidth = r * 0.06;
+        for (let t = -0.6; t <= 0.61; t += 0.2) {
+          const ang = (s < 0 ? 0 : Math.PI) + t;
+          const px = ox + Math.cos(ang) * R, py = cy + Math.sin(ang) * R;
+          const tx = -Math.sin(ang), ty = Math.cos(ang);
+          const k = r * 0.1;
+          g.beginPath();
+          g.moveTo(px - Math.cos(ang) * k + tx * k * 0.5, py - Math.sin(ang) * k + ty * k * 0.5);
+          g.lineTo(px + Math.cos(ang) * k - tx * k * 0.5, py + Math.sin(ang) * k - ty * k * 0.5);
+          g.stroke();
+        }
+      }
+    }
+    // Soft shine on the hair
+    if (color !== 4) {
+      g.strokeStyle = 'rgba(255,255,255,0.22)';
+      g.lineWidth = r * 0.08;
+      g.lineCap = 'round';
+      g.beginPath(); g.arc(cx, cy, r * 0.8, Math.PI * 1.15, Math.PI * 1.4); g.stroke();
+    }
+    g.restore();
+
+    if (color === 1) {
+      // Spiky tufts on top
+      g.fillStyle = HAIR;
+      for (const deg of [-118, -96, -74]) {
+        const t = (deg * Math.PI) / 180, w = 0.2;
+        g.beginPath();
+        g.moveTo(cx + Math.cos(t - w) * r * 0.85, cy + Math.sin(t - w) * r * 0.85);
+        g.lineTo(cx + Math.cos(t) * r * 1.2, cy + Math.sin(t) * r * 1.2);
+        g.lineTo(cx + Math.cos(t + w) * r * 0.85, cy + Math.sin(t + w) * r * 0.85);
+        g.fill();
+      }
+      // Eyes squeezed shut from laughing
+      g.strokeStyle = INK; g.lineWidth = r * 0.09; g.lineCap = 'round';
+      for (const s of [-1, 1]) { g.beginPath(); g.arc(cx + s * r * 0.33, cy + r * 0.04, r * 0.13, Math.PI * 1.1, Math.PI * 1.9); g.stroke(); }
+      cheeks(g, cx, cy + r * 0.2, r);
+      // Big open grin with teeth
+      g.save();
+      g.beginPath();
+      g.moveTo(cx - r * 0.34, cy + r * 0.24);
+      g.quadraticCurveTo(cx, cy + r * 0.92, cx + r * 0.34, cy + r * 0.24);
+      g.closePath();
+      g.fillStyle = '#7a1f2b';
+      g.fill();
+      g.clip();
+      g.fillStyle = '#ffffff';
+      g.fillRect(cx - r * 0.4, cy + r * 0.2, r * 0.8, r * 0.13);
+      g.fillStyle = '#ff7b8a';
+      g.beginPath(); g.ellipse(cx, cy + r * 0.6, r * 0.16, r * 0.1, 0, 0, Math.PI * 2); g.fill();
+      g.restore();
+    } else if (color === 2) {
+      dotEyes(g, cx, cy + r * 0.04, r * 0.33, r * 0.12, blink);
+      // One eyebrow cocked up for a cheeky look
+      g.strokeStyle = HAIR; g.lineWidth = r * 0.07; g.lineCap = 'round';
+      g.beginPath(); g.moveTo(cx - r * 0.45, cy - r * 0.12); g.lineTo(cx - r * 0.2, cy - r * 0.16); g.stroke();
+      cheeks(g, cx, cy + r * 0.26, r);
+      // Lopsided smirk
+      g.strokeStyle = INK; g.lineWidth = r * 0.08;
+      g.beginPath(); g.moveTo(cx - r * 0.24, cy + r * 0.4); g.quadraticCurveTo(cx, cy + r * 0.52, cx + r * 0.28, cy + r * 0.3); g.stroke();
+    } else if (color === 3) {
+      dotEyes(g, cx, cy + r * 0.1, r * 0.3, r * 0.16, blink);
+      cheeks(g, cx, cy + r * 0.34, r);
+      // Small, serious mouth
+      g.fillStyle = '#e0566b';
+      g.beginPath(); g.ellipse(cx, cy + r * 0.48, r * 0.1, r * 0.06, 0, 0, Math.PI * 2); g.fill();
+    }
+  }
+
   function drawBlob(g, x, y, color, opts = {}) {
     const col = COLORS[color];
     const cx = x + S / 2, cy = y + S / 2;
     const r = S * 0.44 * (opts.scale || 1);
     g.save();
     g.globalAlpha = opts.alpha ?? 1;
+    drawBehind(g, cx, cy, r, color);
     const grad = g.createRadialGradient(cx - r * 0.35, cy - r * 0.45, r * 0.1, cx, cy, r);
     grad.addColorStop(0, col.light);
     grad.addColorStop(0.45, col.base);
     grad.addColorStop(1, col.dark);
     g.fillStyle = grad;
-    g.beginPath();
-    // Slightly squashed circle reads as soft and jelly-like.
-    g.ellipse(cx, cy + r * 0.04, r, r * 0.94, 0, 0, Math.PI * 2);
+    ballPath(g, cx, cy, r);
     g.fill();
-    // Eyes
-    const ex = r * 0.34, ey = cy - r * 0.08;
-    g.fillStyle = '#ffffff';
-    g.beginPath(); g.ellipse(cx - ex, ey, r * 0.2, r * 0.26, 0, 0, Math.PI * 2); g.fill();
-    g.beginPath(); g.ellipse(cx + ex, ey, r * 0.2, r * 0.26, 0, 0, Math.PI * 2); g.fill();
-    g.fillStyle = '#1b1530';
-    const look = opts.blink ? 0 : r * 0.06;
-    if (opts.blink) {
-      g.fillRect(cx - ex - r * 0.16, ey - 1, r * 0.32, 3);
-      g.fillRect(cx + ex - r * 0.16, ey - 1, r * 0.32, 3);
-    } else {
-      g.beginPath(); g.arc(cx - ex + look * 0.3, ey + look, r * 0.11, 0, Math.PI * 2); g.fill();
-      g.beginPath(); g.arc(cx + ex + look * 0.3, ey + look, r * 0.11, 0, Math.PI * 2); g.fill();
-    }
+    drawFace(g, cx, cy, r, color, opts.blink);
     if (opts.ring) {
       g.strokeStyle = 'rgba(255,255,255,0.85)';
       g.lineWidth = 2.5;
@@ -805,6 +953,19 @@ button:focus-visible { outline: 3px solid var(--candy); outline-offset: 2px; }
   demo.forEach((row, r) => [...row].forEach((ch, c) => { grid[r][c] = ch === '.' ? 0 : Number(ch); }));
   state = 'title';
   drawNext();
+  const cast = $('cast');
+  for (let c = 1; c <= NUM_COLORS; c++) {
+    const fig = document.createElement('figure');
+    const cv = document.createElement('canvas');
+    cv.width = 56; cv.height = 56;
+    const g = cv.getContext('2d');
+    g.translate(4, 6);
+    drawBlob(g, 0, 0, c);
+    const cap = document.createElement('figcaption');
+    cap.textContent = COLORS[c].name;
+    fig.append(cv, cap);
+    cast.append(fig);
+  }
   requestAnimationFrame(frame);
 })();
 </script>
