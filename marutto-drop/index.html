@@ -544,8 +544,10 @@ button:focus-visible { outline: 3px solid var(--candy); outline-offset: 2px; }
   }
 
   // ---- Rendering -------------------------------------------------------
-  const HAIR = '#2b1d1c';
+  const HAIR = '#1f1716';
   const INK = '#1b1530';
+  const SKIN = { light: '#fde4cb', base: '#f3c79e', shade: '#d99f74' };
+  const SKIN_BABY = { light: '#fff0e0', base: '#f7d4b2', shade: '#e0ab83' };
 
   function ballPath(g, cx, cy, r) {
     g.beginPath();
@@ -553,77 +555,38 @@ button:focus-visible { outline: 3px solid var(--candy); outline-offset: 2px; }
     g.ellipse(cx, cy + r * 0.04, r, r * 0.94, 0, 0, Math.PI * 2);
   }
 
-  function dotEyes(g, cx, ey, ex, size, blink) {
-    if (blink) {
-      g.strokeStyle = INK; g.lineWidth = size * 0.6; g.lineCap = 'round';
-      for (const s of [-1, 1]) { g.beginPath(); g.moveTo(cx + s * ex - size, ey); g.lineTo(cx + s * ex + size, ey); g.stroke(); }
-      return;
-    }
-    g.fillStyle = INK;
-    for (const s of [-1, 1]) { g.beginPath(); g.ellipse(cx + s * ex, ey, size * 0.85, size, 0, 0, Math.PI * 2); g.fill(); }
-    g.fillStyle = '#ffffff';
-    for (const s of [-1, 1]) { g.beginPath(); g.arc(cx + s * ex - size * 0.3, ey - size * 0.4, size * 0.36, 0, Math.PI * 2); g.fill(); }
+  function cheeks(g, cx, y, ex, rx, alpha = 0.45) {
+    g.fillStyle = `rgba(255, 110, 120, ${alpha})`;
+    for (const s of [-1, 1]) { g.beginPath(); g.ellipse(cx + s * ex, y, rx, rx * 0.6, 0, 0, Math.PI * 2); g.fill(); }
   }
 
-  function cheeks(g, cx, y, r) {
-    g.fillStyle = 'rgba(255, 110, 140, 0.5)';
-    for (const s of [-1, 1]) { g.beginPath(); g.ellipse(cx + s * r * 0.58, y, r * 0.16, r * 0.09, 0, 0, Math.PI * 2); g.fill(); }
+  // Skin-toned face with ears, set inside the colored ball so the color still reads for matching.
+  function drawHead(g, cx, cy, r, skin) {
+    const fy = cy + r * 0.1, fr = r * 0.66;
+    g.fillStyle = skin.shade;
+    for (const s of [-1, 1]) { g.beginPath(); g.ellipse(cx + s * fr * 0.98, fy + fr * 0.08, fr * 0.2, fr * 0.24, 0, 0, Math.PI * 2); g.fill(); }
+    const grad = g.createRadialGradient(cx - fr * 0.3, fy - fr * 0.4, fr * 0.1, cx, fy, fr * 1.05);
+    grad.addColorStop(0, skin.light);
+    grad.addColorStop(0.55, skin.base);
+    grad.addColorStop(1, skin.shade);
+    g.fillStyle = grad;
+    g.beginPath(); g.ellipse(cx, fy, fr, fr * 0.97, 0, 0, Math.PI * 2); g.fill();
+    return { fy, fr };
   }
 
-  // Parts that stick out behind the ball (the top bun).
-  function drawBehind(g, cx, cy, r, color) {
-    if (color !== 3) return;
-    g.fillStyle = HAIR;
-    const bx = cx + r * 0.05, by = cy - r * 0.95;
-    for (const [dx, dy, rr] of [[0, 0, 0.3], [-0.2, 0.08, 0.2], [0.2, 0.06, 0.2], [0.05, -0.15, 0.18]]) {
-      g.beginPath(); g.arc(bx + dx * r, by + dy * r, rr * r, 0, Math.PI * 2); g.fill();
-    }
+  function hairShine(g, cx, cy, rad, from, to) {
+    g.strokeStyle = 'rgba(255,255,255,0.18)';
+    g.lineWidth = rad * 0.1;
+    g.lineCap = 'round';
+    g.beginPath(); g.arc(cx, cy, rad, from, to); g.stroke();
   }
 
   function drawFace(g, cx, cy, r, color, blink) {
     g.save();
     ballPath(g, cx, cy, r);
     g.clip();
-    g.fillStyle = HAIR;
-    if (color === 1) {
-      // にこにこ: short hair swept to one side
-      g.beginPath();
-      g.moveTo(cx - r * 1.1, cy - r * 0.15);
-      g.lineTo(cx - r * 0.75, cy - r * 0.32);
-      g.lineTo(cx - r * 0.5, cy - r * 0.22);
-      g.lineTo(cx - r * 0.2, cy - r * 0.42);
-      g.lineTo(cx + r * 0.1, cy - r * 0.3);
-      g.lineTo(cx + r * 0.45, cy - r * 0.5);
-      g.lineTo(cx + r * 0.75, cy - r * 0.32);
-      g.lineTo(cx + r * 1.1, cy - r * 0.2);
-      g.lineTo(cx + r * 1.1, cy - r * 1.2);
-      g.lineTo(cx - r * 1.1, cy - r * 1.2);
-      g.closePath();
-      g.fill();
-    } else if (color === 2) {
-      // ガッツ: straight bowl bangs
-      g.beginPath();
-      g.moveTo(cx - r * 1.1, cy - r * 0.05);
-      const n = 7;
-      for (let i = 0; i <= n; i++) {
-        g.lineTo(cx - r * 0.95 + (i * 1.9 * r) / n, cy - r * (i % 2 ? 0.2 : 0.3));
-      }
-      g.lineTo(cx + r * 1.1, cy - r * 0.05);
-      g.lineTo(cx + r * 1.1, cy - r * 1.2);
-      g.lineTo(cx - r * 1.1, cy - r * 1.2);
-      g.closePath();
-      g.fill();
-    } else if (color === 3) {
-      // くるくる: a ring of curls framing the face
-      for (let a = 160; a <= 380; a += 22) {
-        const t = (a * Math.PI) / 180;
-        g.beginPath(); g.arc(cx + Math.cos(t) * r * 0.86, cy + Math.sin(t) * r * 0.86, r * 0.26, 0, Math.PI * 2); g.fill();
-      }
-      for (let a = 205; a <= 335; a += 26) {
-        const t = (a * Math.PI) / 180;
-        g.beginPath(); g.arc(cx + Math.cos(t) * r * 0.6, cy + Math.sin(t) * r * 0.6, r * 0.22, 0, Math.PI * 2); g.fill();
-      }
-    } else if (color === 4) {
+
+    if (color === 4) {
       // Baseball stitches
       g.strokeStyle = '#d8313f';
       g.lineCap = 'round';
@@ -643,61 +606,123 @@ button:focus-visible { outline: 3px solid var(--candy); outline-offset: 2px; }
           g.stroke();
         }
       }
+      g.restore();
+      return;
     }
-    // Soft shine on the hair
-    if (color !== 4) {
-      g.strokeStyle = 'rgba(255,255,255,0.22)';
-      g.lineWidth = r * 0.08;
-      g.lineCap = 'round';
-      g.beginPath(); g.arc(cx, cy, r * 0.8, Math.PI * 1.15, Math.PI * 1.4); g.stroke();
-    }
-    g.restore();
 
     if (color === 1) {
-      // Spiky tufts on top
+      // にこにこ: neat short black hair, ragged fringe, laughing with eyes shut and teeth showing
+      const { fy, fr } = drawHead(g, cx, cy, r, SKIN);
       g.fillStyle = HAIR;
-      for (const deg of [-118, -96, -74]) {
-        const t = (deg * Math.PI) / 180, w = 0.2;
-        g.beginPath();
-        g.moveTo(cx + Math.cos(t - w) * r * 0.85, cy + Math.sin(t - w) * r * 0.85);
-        g.lineTo(cx + Math.cos(t) * r * 1.2, cy + Math.sin(t) * r * 1.2);
-        g.lineTo(cx + Math.cos(t + w) * r * 0.85, cy + Math.sin(t + w) * r * 0.85);
-        g.fill();
+      g.beginPath();
+      g.moveTo(cx - fr * 1.03, fy + fr * 0.05);
+      g.bezierCurveTo(cx - fr * 1.2, fy - fr * 1.35, cx + fr * 1.2, fy - fr * 1.35, cx + fr * 1.03, fy + fr * 0.05);
+      g.lineTo(cx + fr * 0.88, fy - fr * 0.22);
+      for (const [x, y] of [[0.6, -0.4], [0.38, -0.24], [0.1, -0.44], [-0.15, -0.27], [-0.45, -0.42], [-0.7, -0.26], [-0.9, -0.3]]) {
+        g.lineTo(cx + fr * x, fy + fr * y);
       }
-      // Eyes squeezed shut from laughing
-      g.strokeStyle = INK; g.lineWidth = r * 0.09; g.lineCap = 'round';
-      for (const s of [-1, 1]) { g.beginPath(); g.arc(cx + s * r * 0.33, cy + r * 0.04, r * 0.13, Math.PI * 1.1, Math.PI * 1.9); g.stroke(); }
-      cheeks(g, cx, cy + r * 0.2, r);
-      // Big open grin with teeth
+      g.closePath();
+      g.fill();
+      hairShine(g, cx, fy - fr * 0.1, fr * 0.85, Math.PI * 1.2, Math.PI * 1.45);
+      // Brows lifted from laughing
+      g.strokeStyle = HAIR; g.lineWidth = fr * 0.09; g.lineCap = 'round';
+      for (const s of [-1, 1]) { g.beginPath(); g.arc(cx + s * fr * 0.38, fy - fr * 0.06, fr * 0.16, Math.PI * 1.2, Math.PI * 1.8); g.stroke(); }
+      // Eyes squeezed into happy arcs
+      g.strokeStyle = INK; g.lineWidth = fr * 0.1;
+      for (const s of [-1, 1]) { g.beginPath(); g.arc(cx + s * fr * 0.37, fy + fr * 0.14, fr * 0.15, Math.PI * 1.15, Math.PI * 1.85); g.stroke(); }
+      cheeks(g, cx, fy + fr * 0.32, fr * 0.6, fr * 0.16, 0.35);
+      // Wide open grin, upper teeth showing
       g.save();
       g.beginPath();
-      g.moveTo(cx - r * 0.34, cy + r * 0.24);
-      g.quadraticCurveTo(cx, cy + r * 0.92, cx + r * 0.34, cy + r * 0.24);
+      g.moveTo(cx - fr * 0.42, fy + fr * 0.32);
+      g.quadraticCurveTo(cx, fy + fr * 1.1, cx + fr * 0.42, fy + fr * 0.32);
       g.closePath();
-      g.fillStyle = '#7a1f2b';
+      g.fillStyle = '#6e1d28';
       g.fill();
       g.clip();
       g.fillStyle = '#ffffff';
-      g.fillRect(cx - r * 0.4, cy + r * 0.2, r * 0.8, r * 0.13);
-      g.fillStyle = '#ff7b8a';
-      g.beginPath(); g.ellipse(cx, cy + r * 0.6, r * 0.16, r * 0.1, 0, 0, Math.PI * 2); g.fill();
+      g.fillRect(cx - fr * 0.45, fy + fr * 0.28, fr * 0.9, fr * 0.16);
+      g.fillStyle = '#f07583';
+      g.beginPath(); g.ellipse(cx, fy + fr * 0.78, fr * 0.2, fr * 0.12, 0, 0, Math.PI * 2); g.fill();
       g.restore();
     } else if (color === 2) {
-      dotEyes(g, cx, cy + r * 0.04, r * 0.33, r * 0.12, blink);
-      // One eyebrow cocked up for a cheeky look
-      g.strokeStyle = HAIR; g.lineWidth = r * 0.07; g.lineCap = 'round';
-      g.beginPath(); g.moveTo(cx - r * 0.45, cy - r * 0.12); g.lineTo(cx - r * 0.2, cy - r * 0.16); g.stroke();
-      cheeks(g, cx, cy + r * 0.26, r);
-      // Lopsided smirk
-      g.strokeStyle = INK; g.lineWidth = r * 0.08;
-      g.beginPath(); g.moveTo(cx - r * 0.24, cy + r * 0.4); g.quadraticCurveTo(cx, cy + r * 0.52, cx + r * 0.28, cy + r * 0.3); g.stroke();
+      // ガッツ: thick black hair with heavy bangs, eyes wide and glancing sideways, mischievous pout
+      const { fy, fr } = drawHead(g, cx, cy, r, SKIN);
+      g.fillStyle = HAIR;
+      g.beginPath();
+      g.moveTo(cx - fr * 1.1, fy + fr * 0.2);
+      g.bezierCurveTo(cx - fr * 1.3, fy - fr * 1.45, cx + fr * 1.3, fy - fr * 1.45, cx + fr * 1.1, fy + fr * 0.2);
+      g.lineTo(cx + fr * 0.95, fy + fr * 0.1);
+      const n = 6;
+      for (let i = 0; i <= n; i++) {
+        g.lineTo(cx + fr * 0.85 - (i * 1.7 * fr) / n, fy - fr * (i % 2 ? 0.14 : 0.24));
+      }
+      g.lineTo(cx - fr * 0.95, fy + fr * 0.1);
+      g.closePath();
+      g.fill();
+      hairShine(g, cx, fy - fr * 0.15, fr * 0.9, Math.PI * 1.2, Math.PI * 1.45);
+      const ey = fy + fr * 0.14, ex = fr * 0.36;
+      if (blink) {
+        g.strokeStyle = INK; g.lineWidth = fr * 0.1; g.lineCap = 'round';
+        for (const s of [-1, 1]) { g.beginPath(); g.moveTo(cx + s * ex - fr * 0.15, ey); g.lineTo(cx + s * ex + fr * 0.15, ey); g.stroke(); }
+      } else {
+        g.fillStyle = '#ffffff';
+        for (const s of [-1, 1]) { g.beginPath(); g.ellipse(cx + s * ex, ey, fr * 0.18, fr * 0.2, 0, 0, Math.PI * 2); g.fill(); }
+        g.fillStyle = INK;
+        for (const s of [-1, 1]) { g.beginPath(); g.arc(cx + s * ex - fr * 0.07, ey + fr * 0.02, fr * 0.11, 0, Math.PI * 2); g.fill(); }
+      }
+      cheeks(g, cx, fy + fr * 0.42, fr * 0.6, fr * 0.18, 0.55);
+      // Lips pushed into a sideways smirk
+      g.strokeStyle = '#9b3a3a'; g.lineWidth = fr * 0.1; g.lineCap = 'round';
+      g.beginPath(); g.moveTo(cx - fr * 0.26, fy + fr * 0.62); g.quadraticCurveTo(cx - fr * 0.02, fy + fr * 0.72, cx + fr * 0.24, fy + fr * 0.52); g.stroke();
     } else if (color === 3) {
-      dotEyes(g, cx, cy + r * 0.1, r * 0.3, r * 0.16, blink);
-      cheeks(g, cx, cy + r * 0.34, r);
-      // Small, serious mouth
-      g.fillStyle = '#e0566b';
-      g.beginPath(); g.ellipse(cx, cy + r * 0.48, r * 0.1, r * 0.06, 0, 0, Math.PI * 2); g.fill();
+      // くるくる: big curly dark-brown hair with a top bun, round dark eyes, small lips
+      const curl = '#3b2620';
+      const fy = cy + r * 0.14, fr = r * 0.6;
+      g.fillStyle = curl;
+      // Curls behind the face, down to the cheeks
+      for (let a = 140; a <= 400; a += 20) {
+        const t = (a * Math.PI) / 180;
+        g.beginPath(); g.arc(cx + Math.cos(t) * fr * 1.05, fy - fr * 0.1 + Math.sin(t) * fr * 1.0, fr * 0.32, 0, Math.PI * 2); g.fill();
+      }
+      // Top bun
+      for (const [dx, dy, rr] of [[0, -1.55, 0.34], [-0.25, -1.45, 0.24], [0.25, -1.47, 0.24], [0.05, -1.8, 0.2]]) {
+        g.beginPath(); g.arc(cx + dx * fr, fy + dy * fr, rr * fr, 0, Math.PI * 2); g.fill();
+      }
+      const skin = SKIN_BABY;
+      const grad = g.createRadialGradient(cx - fr * 0.3, fy - fr * 0.3, fr * 0.1, cx, fy, fr * 1.05);
+      grad.addColorStop(0, skin.light);
+      grad.addColorStop(0.55, skin.base);
+      grad.addColorStop(1, skin.shade);
+      g.fillStyle = grad;
+      g.beginPath(); g.ellipse(cx, fy + fr * 0.05, fr * 0.98, fr * 0.95, 0, 0, Math.PI * 2); g.fill();
+      // Curly fringe pulled up off the forehead
+      g.fillStyle = curl;
+      for (const [dx, dy, rr] of [[-0.55, -0.62, 0.26], [-0.2, -0.82, 0.26], [0.2, -0.8, 0.26], [0.58, -0.6, 0.26], [0, -1.0, 0.26]]) {
+        g.beginPath(); g.arc(cx + dx * fr, fy + dy * fr, rr * fr, 0, Math.PI * 2); g.fill();
+      }
+      g.strokeStyle = 'rgba(255,255,255,0.2)'; g.lineWidth = fr * 0.08; g.lineCap = 'round';
+      for (const [dx, dy] of [[-0.55, -0.62], [0.2, -0.8], [-0.9, -0.1]]) {
+        g.beginPath(); g.arc(cx + dx * fr, fy + dy * fr, fr * 0.14, Math.PI * 1.1, Math.PI * 1.7); g.stroke();
+      }
+      const ey = fy + fr * 0.08, ex = fr * 0.36;
+      if (blink) {
+        g.strokeStyle = INK; g.lineWidth = fr * 0.1; g.lineCap = 'round';
+        for (const s of [-1, 1]) { g.beginPath(); g.moveTo(cx + s * ex - fr * 0.16, ey); g.lineTo(cx + s * ex + fr * 0.16, ey); g.stroke(); }
+      } else {
+        g.fillStyle = INK;
+        for (const s of [-1, 1]) { g.beginPath(); g.ellipse(cx + s * ex, ey, fr * 0.17, fr * 0.2, 0, 0, Math.PI * 2); g.fill(); }
+        g.fillStyle = '#ffffff';
+        for (const s of [-1, 1]) {
+          g.beginPath(); g.arc(cx + s * ex - fr * 0.05, ey - fr * 0.08, fr * 0.07, 0, Math.PI * 2); g.fill();
+        }
+      }
+      cheeks(g, cx, fy + fr * 0.4, fr * 0.6, fr * 0.2, 0.4);
+      // Small, serious lips
+      g.fillStyle = '#e06a74';
+      g.beginPath(); g.ellipse(cx, fy + fr * 0.6, fr * 0.14, fr * 0.08, 0, 0, Math.PI * 2); g.fill();
     }
+    g.restore();
   }
 
   function drawBlob(g, x, y, color, opts = {}) {
@@ -706,7 +731,6 @@ button:focus-visible { outline: 3px solid var(--candy); outline-offset: 2px; }
     const r = S * 0.44 * (opts.scale || 1);
     g.save();
     g.globalAlpha = opts.alpha ?? 1;
-    drawBehind(g, cx, cy, r, color);
     const grad = g.createRadialGradient(cx - r * 0.35, cy - r * 0.45, r * 0.1, cx, cy, r);
     grad.addColorStop(0, col.light);
     grad.addColorStop(0.45, col.base);
